@@ -1,4 +1,4 @@
-function [H,r,row] = Hankel(order,signal)
+function [H,r,row] = HankelMat(order,signal)
     % signal 的每列对应一个采样时刻；单通道信号应传入行向量。
     validateattributes(signal, {'numeric'}, ...
         {'2d', 'nonempty', 'real', 'finite'}, mfilename, 'signal', 2);
