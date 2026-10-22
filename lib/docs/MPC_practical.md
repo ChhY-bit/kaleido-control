@@ -1,30 +1,41 @@
+
+## 1 问题定义
+
 对于离散 LTI 系统
 
 $$
 \begin{aligned}
-    x_{k+1} &= Ax_k + Bu_k, \\
-    y_k &= Cx_k + Du_k,
+    x(k+1) &= Ax(k) + Bu(k), \\
+    y(k) &= Cx(k) + Du(k),
 \end{aligned}
 $$
 
-控制参考信号为 $r(k),\;k = 0,1,2,\cdots$
+$x(k)\in\mathbb{R}^{n},u(k)\in\mathbb{R}^{m},y(k)\in\mathbb{R}^{p},k\in\mathbb{Z}_{\ge 0}.$
+
+控制参考信号为 $r(k)\in\mathbb{R}^{p},\;R_{N}(k) := [r^\top(k),r^\top(k+1),\cdots,r^\top(k+N-1)]^\top.$
+
+## 2 模型预测控制框架
 
 记 $x(k+i|k)$ 为 $k$ 时刻对此后第 $i$ 个时间步的状态预测，同理有 $y(k+i|k),u(k+i|k).$
 
 定义控制增量 $\Delta u(k+i|k) = u(k+i|k)-u(k+i-1|k)$
 
 $$ \begin{aligned}
-\min \quad & J(k) = \sum_{i=0}^{N-1} \left( \left\|r(k+i) - y(k+i|k)\right\|_Q^2 + \left\|u(k+i|k)\right\|^2_R \right) \\
-&\quad + \left\| r(k+N)-y(k+N|k) \right\|_P^2 + \sum_{i=1}^{N-1}\left\|\Delta u(k+i|k)\right\|_S^2. \\ 
-\text{s.t.} \quad & x(k|k) = x_k,\\
+\min \quad & J(k) = \sum_{i=0}^{N-1} \left( \left\|r(k+i) - y(k+i|k)\right\|_Q^2 + \left\|u(k+i|k)\right\|^2_R \right) + \\
+&\qquad \quad \left\| r(k+N)-y(k+N|k) \right\|_P^2 + \sum_{i=1}^{N-1}\left\|\Delta u(k+i|k)\right\|_S^2. \\
+\text{s.t.} \quad & x(k|k) = x(k),\\
 & x(k+i+1|k) = Ax(k+i|k) + Bu(k+i|k), \quad i = 0,1,2,\cdots,N-1\\
 & y(k+i|k) = Cx(k+i|k) + Du(k+i|k), \quad i = 0,1,2,\cdots,N-1\\
 & u(k+i|k) \in \mathcal{U}, \quad i = 0,1,2,\cdots,N-1\\
 & y(k+i|k) \in \mathcal{Y}, \quad i = 0,1,2,\cdots,N-1\\
 & \Delta u(k+i|k)\in \mathcal{D}, \quad i = 1,2,\cdots,N-1\\
-& y(k+N|k) \in \mathcal{Y}_f.
+& y(k+N|k) \in \mathcal{Y}_t.
 \end{aligned}
 $$
+
+## 3 优化求解
+
+### 3.1 递推预测
 
 $$\begin{aligned}
     x(k+1|k) &= Ax(k|k) + Bu(k|k), \\
@@ -33,22 +44,21 @@ $$\begin{aligned}
     x(k+3|k) &= Ax(k+2|k) + Bu(k+2|k) \\
     &= A^3x(k|k) + A^2Bu(k|k) + ABu(k+1|k) + Bu(k+2|k), \\
     \vdots \\
-    x(k+i|k) &= A^ix(k|k) + \sum_{m=0}^{i-1}A^{i-m-1}Bu(k+m|k), \\
-    \vdots
+    x(k+N|k) &= A^Nx(k|k) + \sum_{m=0}^{N-1}A^{N-m-1}Bu(k+m|k).
 \end{aligned}
 $$
 
 整理为 
 
 $$
-X(k|k) = \mathcal{S}_x x(k|k) + \mathcal{S}_u U(k)
+X(k+1|k) = \mathcal{S}_x x(k|k) + \mathcal{S}_u U(k)
 $$
 
 其中
 
 $$
 \begin{aligned}
-X(k|k) &:= \begin{bmatrix}
+X(k+1|k) &:= \begin{bmatrix}
     x(k+1|k) \\ x(k+2|k) \\ x(k+3|k) \\ \vdots \\ x(k+N|k)
 \end{bmatrix}, \quad
 U(k) := \begin{bmatrix}
@@ -93,20 +103,6 @@ Y(k|k) &:= \begin{bmatrix}
 \end{aligned}
 $$
 
-特别地，针对终端时刻，有 
-
-$$
-\begin{aligned}
-y(k+N|k) &= CA^{N}x(k|k) \\
-&\quad + \left[\begin{array}{cccc:c}
-    CA^{N-1}B & CA^{N-2}B & \cdots & CB & D
-\end{array}\right] \left[\begin{array}{c}
-    U(k) \\ \hdashline
-    u(k+N|k)
-\end{array}\right].
-\end{aligned}
-$$
-
 针对控制增量，定义 $$\Delta U(k):=\begin{bmatrix}
     \Delta u(k+1|k) \\ \Delta u(k+2|k) \\ \cdots \\ \Delta u(k+N-1|k)
 \end{bmatrix}$$ 那么有
@@ -121,4 +117,142 @@ $$
 U(k),\quad I\in\mathbb{R}^{m\times m}.
 $$
 
-则原代价函数可以重写为
+### 3.2 终端情况
+
+特别地，针对终端时刻，有 
+
+$$
+\begin{aligned}
+y(k+N|k) &= CA^{N}x(k|k) + \sum_{m=0}^{N-1} CA^{N-1-m}B\, u(k+m|k) + D\, u(k+N|k) \\
+&= CA^Nx(k|k) + C\Gamma_u U(k) + Du(k+N|k).
+\end{aligned}
+$$
+
+其中 $$\Gamma_u = \begin{bmatrix}A^{N-1}B & A^{N-2}B & \cdots & B \end{bmatrix}.$$
+
+并且终端控制量 $u(k+N|k)$ 一般设计为状态反馈 $$ u(k+N|k) = K\underbrace{\left( A^N x(k|k) + \Gamma_u U(k) \right)}_{x(k+N|k)}, $$ 其中 $K$ 可通过极点配置或LQR等方法获得。那么，终端输出应为
+
+$$
+y(k+N|k) = \underbrace{(C + DK)}_{C_t}(A^N x(k|k) + \Gamma_u U(k)).
+$$
+
+### 3.3 重写代价函数
+
+定义权重增广矩阵：
+
+$$\mathcal{Q}:=I_N\otimes Q,\quad \mathcal{R} := I_N\otimes R,\quad \mathcal{S}:=I_{N-1}\otimes S.$$
+
+> 若考虑时变权重，则将不同时刻权重构成分块对角矩阵即可，例如 $\text{blkdiag}[Q(k),Q(k+1),\cdots,Q(k+N-1)].$
+
+重写为标准二次规划问题：
+
+$$ \begin{aligned}
+J(k) &= \left\|Y(k|k)-R_N(k)\right\|^2_\mathcal{Q} + 
+\left\| U(k)\right\|^2_\mathcal{R} + 
+\left\| \Delta U(k) \right\|^2_\mathcal{S} + \| r(k+N)-y(k+N|k) \|^2_P \\
+&= \left\|\mathcal{T}_u U(k)+\overbrace{\mathcal{T}_x x(k|k)-R_N(k)}^{\Phi}\right\|^2_\mathcal{Q} + 
+\left\| U(k)\right\|^2_\mathcal{R} + 
+\left\| \mathcal{S}_\Delta U(k) \right\|^2_\mathcal{S} + \\
+& \quad \; \left\| C_t\Gamma_u U(k) + \underbrace{C_tA^N x(k|k) - r(k+N)}_{\Psi} \right\|^2_P \\
+&= U^\top(k) \underbrace{\left( \Gamma_u^\top C_t^\top P C_t \Gamma_u + \mathcal{T}_u^\top \mathcal{Q} \mathcal{T}_u + \mathcal{R} + \mathcal{S}_\Delta^\top \mathcal{S}\mathcal{S}_\Delta \right)}_{H} U(k) + \\
+& \quad \; 2\underbrace{\left( \Psi^\top PC_t\Gamma_u + \Phi^\top \mathcal{Q} \mathcal{T}_u \right)}_{f^\top} U(k) + \underbrace{\Psi^\top P \Psi + \Phi^\top\mathcal{Q}\Phi}_{c}
+\end{aligned}
+$$
+
+### 3.4 重写约束条件
+
+采用凸多面体约束（假设终端约束也已经化为多面体约束）：
+
+$$
+y_{\min}(k+i) \le y(k+i|k) \le y_{\max}(k+i), \quad i=0,1,\cdots,N-1 \\
+u_{\min}(k+i) \le u(k+i|k) \le u_{\max}(k+i), \quad i=0,1,\cdots,N-1 \\
+\Delta u_{\min}(k+i) \le \Delta u(k+i|k) \le \Delta u_{\max}(k+i), \quad i=1,2,\cdots,N-1\\
+y_{t,\min} \le y(k+N|k) \le y_{t,\max}.\\
+$$
+
+定义
+
+$$
+Y_{lb}(k):=
+\begin{bmatrix}
+y_{\min}(k) \\ y_{\min}(k+1) \\ \vdots \\ y_{\min}(k+N-1)
+\end{bmatrix},\quad
+Y_{ub}(k):=
+\begin{bmatrix}
+y_{\max}(k) \\ y_{\max}(k+1) \\ \vdots \\ y_{\max}(k+N-1)
+\end{bmatrix},
+$$
+
+> 若约束界限不时变，则退化为 $ Y_{lb} := \mathbf{1}_N \otimes y_{\min} $，余者同理。
+
+$$
+\Delta_{lb}(k):=
+\begin{bmatrix}
+\Delta u_{\min}(k+1) \\ \Delta u_{\min}(k+2) \\ \vdots \\ \Delta u_{\min}(k+N-1)
+\end{bmatrix},\quad
+\Delta_{ub}(k):=
+\begin{bmatrix}
+\Delta u_{\max}(k+1) \\ \Delta u_{\max}(k+2) \\ \vdots \\ \Delta u_{\max}(k+N-1)
+\end{bmatrix},
+$$
+
+$$
+U_{lb}(k):=
+\begin{bmatrix}
+u_{\min}(k) \\ u_{\min}(k+1) \\ \vdots \\ u_{\min}(k+N-1)
+\end{bmatrix},\quad
+U_{ub}(k):=
+\begin{bmatrix}
+u_{\max}(k) \\ u_{\max}(k+1) \\ \vdots \\ u_{\max}(k+N-1)
+\end{bmatrix}.
+$$
+
+重写为
+
+$$
+Y_{lb}(k) \le \mathcal{T}_x x(k|k) + \mathcal{T}_u U(k) \le Y_{ub}(k), \\
+U_{lb}(k) \le U(k) \le U_{ub}(k), \\
+\Delta_{lb} \le \mathcal{S}_\Delta U(k) \le \Delta_{ub}, \\
+y_{t,\min} \le C_t\Gamma_u U(k) + C_t A^N x(k|k) \le y_{t,\max}.\\
+$$
+
+整理为矩阵：
+
+$$
+\underbrace{\begin{bmatrix}
+U_{lb}(k) \\ \Delta_{lb}(k) \\ Y_{lb}(k)-\mathcal{T}_x x(k|k) \\ y_{t,\min} - C_t A^N x(k|k)
+\end{bmatrix}}_{G_{lb}} \le 
+\underbrace{\begin{bmatrix}
+I_{mN} \\ \mathcal{S}_\Delta \\ \mathcal{T}_{u} \\ C_t\Gamma_u
+\end{bmatrix}}_{F} U(k) \le
+\underbrace{\begin{bmatrix}
+U_{ub}(k) \\ \Delta_{ub}(k) \\ Y_{ub}(k)-\mathcal{T}_x x(k|k) \\ y_{t,\max} - C_t A^N x(k|k)
+\end{bmatrix}}_{G_{ub}}.
+$$
+
+如果 QP 求解器要求的形式为 $F U \le G $，那么可以再通过引入负号的方式加以处理。
+
+### 3.5 状态观测
+
+每次采样时，需获知当前 $x(k|k) = x(k).$
+
+若 $p=n$，$C$ 可逆且 $D=0$，则 $$x(k) = C^{-1}y(k).$$
+
+一般情况下，采用状态观测器
+
+$$ \begin{cases}
+\hat{x}(k+1) = A \hat{x}(k) + Bu(k) + L\left(y(k)-\hat{y}(k)\right), \\ \hat{y}(k) = C\hat{x}(k) + Du(k).
+\end{cases}$$
+
+
+## 4 算法总结
+
+**已知信息：**
+- 系统模型 $A,B,C,D$
+- 设定权重 $P,Q,R,S$
+- 约束界限 $y_{t,\min / \max},y_{\min / \max},u_{\min / \max},\Delta u_{\min / \max}$
+
+**离线部分：**
+
+
+**在线部分：**
