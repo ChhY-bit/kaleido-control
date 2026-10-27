@@ -150,12 +150,12 @@ $$ \begin{aligned}
 J(k) &= \left\|Y(k|k)-R_N(k)\right\|^2_\mathcal{Q} + 
 \left\| U(k)\right\|^2_\mathcal{R} + 
 \left\| \Delta U(k) \right\|^2_\mathcal{S} + \| r(k+N)-y(k+N|k) \|^2_P \\
-&= \left\|\mathcal{T}_u U(k)+\overbrace{\mathcal{T}_x x(k|k)-R_N(k)}^{\Phi}\right\|^2_\mathcal{Q} + 
+&= \left\|\mathcal{T}_u U(k)+\overbrace{\mathcal{T}_x x(k|k)-R_N(k)}^{\Phi(k)}\right\|^2_\mathcal{Q} + 
 \left\| U(k)\right\|^2_\mathcal{R} + 
 \left\| \mathcal{S}_\Delta U(k) \right\|^2_\mathcal{S} + \\
-& \quad \; \left\| C_t\Gamma_u U(k) + \underbrace{C_tA^N x(k|k) - r(k+N)}_{\Psi} \right\|^2_P \\
+& \quad \; \left\| C_t\Gamma_u U(k) + \underbrace{C_tA^N x(k|k) - r(k+N)}_{\Psi(k)} \right\|^2_P \\
 &= U^\top(k) \underbrace{\left( \Gamma_u^\top C_t^\top P C_t \Gamma_u + \mathcal{T}_u^\top \mathcal{Q} \mathcal{T}_u + \mathcal{R} + \mathcal{S}_\Delta^\top \mathcal{S}\mathcal{S}_\Delta \right)}_{H} U(k) + \\
-& \quad \; 2\underbrace{\left( \Psi^\top PC_t\Gamma_u + \Phi^\top \mathcal{Q} \mathcal{T}_u \right)}_{f^\top} U(k) + \underbrace{\Psi^\top P \Psi + \Phi^\top\mathcal{Q}\Phi}_{c}
+& \quad \; 2\underbrace{\left( \Psi^\top(k) PC_t\Gamma_u + \Phi^\top(k) \mathcal{Q} \mathcal{T}_u \right)}_{f^\top(k)} U(k) + \underbrace{\Psi^\top(k) P \Psi(k) + \Phi^\top(k)\mathcal{Q}\Phi(k)}_{c(k)}
 \end{aligned}
 $$
 
@@ -221,13 +221,13 @@ $$
 $$
 \underbrace{\begin{bmatrix}
 U_{lb}(k) \\ \Delta_{lb}(k) \\ Y_{lb}(k)-\mathcal{T}_x x(k|k) \\ y_{t,\min} - C_t A^N x(k|k)
-\end{bmatrix}}_{G_{lb}} \le 
+\end{bmatrix}}_{G_{lb}(k)} \le 
 \underbrace{\begin{bmatrix}
 I_{mN} \\ \mathcal{S}_\Delta \\ \mathcal{T}_{u} \\ C_t\Gamma_u
 \end{bmatrix}}_{F} U(k) \le
 \underbrace{\begin{bmatrix}
 U_{ub}(k) \\ \Delta_{ub}(k) \\ Y_{ub}(k)-\mathcal{T}_x x(k|k) \\ y_{t,\max} - C_t A^N x(k|k)
-\end{bmatrix}}_{G_{ub}}.
+\end{bmatrix}}_{G_{ub}(k)}.
 $$
 
 如果 QP 求解器要求的形式为 $F U \le G $，那么可以再通过引入负号的方式加以处理。
@@ -247,12 +247,24 @@ $$ \begin{cases}
 
 ## 4 算法总结
 
-**已知信息：**
+**给定信息：**
 - 系统模型 $A,B,C,D$
-- 设定权重 $P,Q,R,S$
-- 约束界限 $y_{t,\min / \max},y_{\min / \max},u_{\min / \max},\Delta u_{\min / \max}$
+- 设定权重 $Q,R,S$
+- 预测步数 $N$
+- 终端要素 $K,y_{t,\min/\max},P$
+- 控制目标 $r(k),\;k=0,1,2,\cdots$
+- 约束界限 $y_{\min / \max}(k),u_{\min / \max}(k),\Delta u_{\min / \max}(k)$
 
 **离线部分：**
-
+- 计算 $C_t,\mathcal{Q},\mathcal{R},\mathcal{S}.$
+- 构建 $\mathcal{T}_x,\mathcal{T}_u,\mathcal{S}_\Delta,\Gamma_u.$
+- 构建 $H,F$
 
 **在线部分：**
+- 获取 $x(k|k)$ （或 $\hat{x}(k|k)$）
+- 截取 $R_N(k),r(k+N),Y_{lb/ub}(k),U_{lb/ub}(k),\Delta_{lb/ub}(k).$
+- 计算 $\Phi(k),\Psi(k),G_{lb/ub}(k).$
+- 计算 $f^\top(k),c(k).$
+- 求解 $\min_{U} U^\top H U + 2f^\top(k) U + c(k),\;\text{s.t.}G_{lb} \le FU \le G_{ub}.$
+- 取 $U(k)$ 的第一组控制量执行。
+- （可选）$U(k)$ 移位，补充终端控制量，作为热启动解
