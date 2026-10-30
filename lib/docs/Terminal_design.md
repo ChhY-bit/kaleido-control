@@ -58,8 +58,15 @@ $$ \begin{aligned}
 \end{aligned}
 $$
 
-考虑到标称条件下，$$\bar{x}(k+i|k+1) = x^*(k+i|k),\quad i=1,2,\cdots,N$$ 那么作差可得
+考虑到标称条件下，$$\bar{x}(k+i|k+1) = x^*(k+i|k),\quad i=1,2,\cdots,N$$ 并且在执行终端控制后有
 
 $$
-\bar{J}(k+1) - J^*(k) = \left\|\bar{x}(k+1+N|k+1)-x_r(k+1+N)\right\|_Q^2 - \left\|x^*(k+1|k)-x_r(k+1)\right\|_Q^2 
+\bar{x}_e(k+1+N|k+1) = A_t \bar{x}_e(k+N|k+1),\quad A_t = A+BK_t.
+$$
+
+那么作差可得
+
+$$ \begin{aligned}
+\bar{J}(k+1) - J^*(k) &= \left\|x^*(k+N|k)-x_r(k+N)\right\|_{A_t^\top Q A_t + K_t^\top R K_t}^2 - \\ & \quad\; \left\|x^*(k+1|k)-x_r(k+1)\right\|_{Q}^2 - \left\|u^*(k|k)-u_r(k)\right\|_{R}^2 + \\ & \quad\; \left\| x^*(k+N|k) - x_r(k+N) \right\|^2_{A^\top_t PA_t-P} + \left\|  \right\|^2_S
+\end{aligned}
 $$
