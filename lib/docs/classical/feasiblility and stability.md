@@ -84,7 +84,7 @@ then the difference of the two cost functions will be
 
 $$\bar{J}(k+1) - J^*(k) \le - \left(\|x^*(k|k)\|_Q^2 + \left\|u^*(k|k)\right\|_R^2\right) \le 0$$
 
-If resolving the receding optimization problem, it is obvious that the optimal cost will be more optimal than the feasible cost, i.e. $J^*(k+1)\le \bar{J}(k+1).$ Hence $$J^*(k+1) - J^*(k) \le - \left(\|x^*(k|k)\|_Q^2 + \left\|u^*(k|k)\right\|_R^2\right) \le 0.$$ The latter equal sign holds if and only if $x^*(k|k) = 0$ and $u^*(k|k) = 0$, which means the system is then can be proved asymptotically stable.
+If resolving the receding optimization problem, it is obvious that the optimal cost will be more optimal than the feasible cost, i.e. $J^*(k+1)\le \bar{J}(k+1).$ Hence $$J^*(k+1) - J^*(k) \le - \left(\|x^*(k|k)\|_Q^2 + \left\|u^*(k|k)\right\|_R^2\right) \le 0.$$ The latter equal sign holds if and only if $x^*(k|k) = 0$ and $u^*(k|k) = 0$, which means the sysem is then can be proved asymptotically stable.
 
 Therefore, the inequality above of $P$ holding is the sufficient (but not necessary) condition for the system to be asymptotically stable.
 
