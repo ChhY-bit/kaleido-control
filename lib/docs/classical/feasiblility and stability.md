@@ -129,7 +129,7 @@ The quadratic constraints $$ x^\top(k+N|k) M x(k+N|k) \le \alpha $$ cannot be in
 
 **Algorithm:**
 $k \leftarrow 0,\;G\leftarrow M,\;E_t\leftarrow I_n$
-**while** $ r^\top |G| r > \alpha $ **do:**
+**while** $ r^\top \mathrm{abs}(G) r > \alpha $ **do:**
 $G \leftarrow A_t^\top G A_t$
 $k \leftarrow k+1$
 $ E_t \leftarrow \mathrm{col}(E_t,A_t^{-k})$
