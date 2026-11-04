@@ -115,7 +115,7 @@ $$\begin{aligned} \max \quad & \alpha, \\ \text{s.t.}\quad & \mathcal{X}_t \subs
 
 The quadratic constraints $$ x^\top(k+N|k) M x(k+N|k) \le \alpha $$ cannot be inputed into the LQ-MPC framework directly. If only the linear-quadratic solver available (such as OSQP), it is necessary to replace the quadratic constraint with a linear/polyhedral constraint $$x_{t.\min} \le E_t x(k+N|k) \le x_{t,\max}.$$
 
-### Algorithm of Determining Linear Terminal Constraint
+### A Simple Algorithm
 
 **Input:**
 - Closed-loop system matrix $A_t$
@@ -140,3 +140,4 @@ $ x_{t,\min} \leftarrow -\boldsymbol{1}_{k+1} \otimes r $
 
 **Output:** $E_t,x_{t,\max},x_{t,\min}$
 
+### Better Algorithm
