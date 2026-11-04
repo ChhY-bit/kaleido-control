@@ -141,3 +141,5 @@ $ x_{t,\min} \leftarrow -\boldsymbol{1}_{k+1} \otimes r $
 **Output:** $E_t,x_{t,\max},x_{t,\min}$
 
 ### Better Algorithm
+
+**Reference:** Squaring the circle: An algorithm for generating polyhedral invariant sets from ellipsoidal ones (Automatica, 2007)
