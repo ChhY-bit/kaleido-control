@@ -18,9 +18,9 @@ classdef mpc < handle
         % ---------- 终端要素 ----------
         P       % [nxn] 终端权重矩阵
         Kt      % [mxn] 终端反馈增益，约定 u_t = Kt*x；可为空
-        xt_max  % [ntx1] Et*x 的终端约束上界
-        xt_min  % [ntx1] Et*x 的终端约束下界
-        Et      % [ntxn] 终端约束系数矩阵；为空时不启用终端约束
+        xt_max  % [nx1] Et*x 的终端约束上界
+        xt_min  % [nx1] Et*x 的终端约束下界
+        Et      % [nxn] 终端约束系数矩阵；为空时不启用终端约束
         
         % ---------- 约束界限 ----------
         % （可能在线更新）
@@ -286,7 +286,7 @@ classdef mpc < handle
             info.state = struct('stage',stage,'configured',configured, ...
                 'initialized',initialized,'ready',ready,'solved',solved);
             info.model = struct('n',n,'m',m,'p',p,'N',obj.N, ...
-                'A',obj.A,'B',obj.B,'C',obj.C,'D',obj.D);
+                'A',obj.A,'B',obj.B,'C',obj.C,'D',obj.D); %#ok<*PROPLC>
             info.weights = struct('Q',obj.Q,'R',obj.R,'P',obj.P);
             info.terminal = struct('enabled',~isempty(obj.Et),'rows',size(obj.Et,1), ...
                 'Et',obj.Et,'lower',obj.xt_min,'upper',obj.xt_max,'Kt',obj.Kt);
@@ -376,7 +376,7 @@ classdef mpc < handle
                 return;
             end
             timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss.SSS'));
-            fprintf('[%s] %-9s %s\n', timestamp, '(INFO)', char(str));
+            fprintf('[%s] [MPC] %-9s %s\n', timestamp, '(INFO)', char(str));
         end
 
         function logWarning(obj,str)
@@ -385,7 +385,7 @@ classdef mpc < handle
                 return;
             end
             timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss.SSS'));
-            warning('[%s] %-9s %s', timestamp, '(WARNING)', char(str));
+            warning('[%s] [MPC] %-9s %s', timestamp, '(WARNING)', char(str));
         end
     end
 
@@ -423,7 +423,7 @@ classdef mpc < handle
         function logError(str)
             % LOGERROR 为已格式化的消息添加时间戳和对齐的 ERROR 标签
             timestamp = char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss.SSS'));
-            error('[%s] %-9s %s', timestamp, '(ERROR)', char(str));
+            error('[%s] [MPC] %-9s %s', timestamp, '(ERROR)', char(str));
         end
     end
 end
