@@ -19,9 +19,9 @@ classdef terminal_designer < handle
         % ---------- 终端要素 ----------
         P       % [nxn] 终端权重矩阵
         Kt      % [mxn] 终端反馈增益，约定 u_t = Kt*x；可为空
-        xt_max  % [nx1] Et*x 的终端约束上界
-        xt_min  % [nx1] Et*x 的终端约束下界
-        Et      % [nxn] 终端约束系数矩阵；为空时不启用终端约束
+        xt_max  % [ntx1] Et*x 的终端约束上界
+        xt_min  % [ntx1] Et*x 的终端约束下界
+        Et      % [ntxn] 终端约束系数矩阵；为空时不启用终端约束
 
         % ---------- 中间变量 ----------
         M       % Lyapunov 解
@@ -39,7 +39,15 @@ classdef terminal_designer < handle
     end
 
     methods
-        function obj = terminal_designer(W,epsilon,xb,ub)
+        function obj = terminal_designer(A,B,Q,R)
+            obj.A = A;
+            obj.B = B;
+            obj.Q = Q;
+            obj.R = R;
+            obj.logInfo("Terinal set designer is created!");
+        end
+
+        function setParams(obj,W,epsilon,xb,ub)
             obj.W = W;
             obj.epsilon = epsilon;
             obj.x_lb = xb(:,1);
@@ -50,6 +58,7 @@ classdef terminal_designer < handle
         end
 
         function design(obj,Kt_type,params)
+            n = size(obj.A,1);
             % 确定增益
             switch lower(Kt_type)
                 case 'lqr'
@@ -69,17 +78,20 @@ classdef terminal_designer < handle
 
             % 确定大小
             obj.alpha = obj.computeAlpha;
-            if obj.ifPlot && size(obj.A,1)>=2 && size(obj.A,1)<=3
+            if obj.ifPlot && n>=2 && n<=3
                 fig = figure();
-                ctr.plots.plotEllipsoid(obj.M,obj.alpha,fig);
+                ctr.plots.plotEllipsoid(obj.M,obj.alpha,[],fig);
             end
 
             % 终端约束线性化
             obj.logInfo("Terminal rigion linearized...");
             [obj.xt_min,obj.xt_max,obj.Et] = ctr.terminalSet_linear(obj.At,obj.M,obj.alpha);
-            if obj.ifPlot && size(obj.A,1)>=2 && size(obj.A,1)<=3
-                ctr.plots.plotPolytope(obj.Et,obj.xt_min,obj.xt_max,fig);
+            if obj.ifPlot && n>=2 && n<=3
+                ctr.plots.plotPolytope(obj.Et,obj.xt_min,obj.xt_max,[],fig);
             end
+
+            % 终端代价权重
+            obj.P = dlyap(obj.At',obj.Q+obj.Kt'*obj.R*obj.Kt+obj.epsilon*eye(n));
 
             obj.logInfo("Terminal ingredient designing done!");
         end
@@ -100,6 +112,11 @@ classdef terminal_designer < handle
             h = [obj.x_ub;-obj.x_lb;obj.u_ub;-obj.u_lb];
             len = size(G,1);
             alpha = zeros(len,1);
+
+            if any(isnan(h)) || any(h < 0)
+                obj.logError('State and input bounds must contain the origin.');
+            end
+
             for i = 1:len
                 if any(G(i,:))
                     alpha(i) = h(i)^2/(G(i,:)*(obj.M\G(i,:)'));

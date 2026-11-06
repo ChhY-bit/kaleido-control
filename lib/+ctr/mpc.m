@@ -1,14 +1,12 @@
 classdef mpc < handle
 %MPC 标准线性模型预测控制
-% n、m、p 分别为状态、输入、输出维数；nt 为启用的终端约束行数。
+% n、m 分别为状态、输入维数；nt 为启用的终端约束行数。
 % 启用终端约束时 nt = size(Et,1)，未启用时 nt = 0。
 
     properties(Access=private)
         % ---------- 基本属性 ----------
         A   % [nxn] 系统矩阵
         B   % [nxm] 输入矩阵
-        C   % [pxn] 输出矩阵
-        D   % [pxm] 前馈矩阵
 
         Q   % [nxn] 状态权重矩阵
         R   % [mxm] 控制权重矩阵
@@ -70,9 +68,9 @@ classdef mpc < handle
         end
         
         % ---------- 设置 MPC 问题 ----------
-        function setProblem(obj,A,B,C,D,N,Q,R)
-            % (A,B,C,D) 应当是离散系统
-            obj.A = A; obj.B = B; obj.C = C; obj.D = D;
+        function setProblem(obj,A,B,N,Q,R)
+            % (A,B) 为离散状态方程 x(k+1) = A*x(k) + B*u(k) 的矩阵。
+            obj.A = A; obj.B = B;
             obj.N = N; obj.Q = Q; obj.R = R;
             obj.resetCache();
 
@@ -247,12 +245,9 @@ classdef mpc < handle
             end
             validateattributes(verbose,{'logical','numeric'},{'scalar','binary'},mfilename,'verbose');
 
-            n = []; m = []; p = []; decisionCount = [];
+            n = []; m = []; decisionCount = [];
             if ~isempty(obj.B)
                 [n,m] = size(obj.B);
-            end
-            if ~isempty(obj.C)
-                p = size(obj.C,1);
             end
             if ~isempty(m) && ~isempty(obj.N)
                 decisionCount = m*obj.N;
@@ -285,8 +280,8 @@ classdef mpc < handle
 
             info.state = struct('stage',stage,'configured',configured, ...
                 'initialized',initialized,'ready',ready,'solved',solved);
-            info.model = struct('n',n,'m',m,'p',p,'N',obj.N, ...
-                'A',obj.A,'B',obj.B,'C',obj.C,'D',obj.D); %#ok<*PROPLC>
+            info.model = struct('n',n,'m',m,'N',obj.N, ...
+                'A',obj.A,'B',obj.B); %#ok<*PROPLC>
             info.weights = struct('Q',obj.Q,'R',obj.R,'P',obj.P);
             info.terminal = struct('enabled',~isempty(obj.Et),'rows',size(obj.Et,1), ...
                 'Et',obj.Et,'lower',obj.xt_min,'upper',obj.xt_max,'Kt',obj.Kt);
@@ -305,8 +300,8 @@ classdef mpc < handle
 
             fprintf('\n================ MPC overview ================\n');
             obj.printViewSection('State',{'Stage',stage});
-            obj.printViewSection('Model',{'n (states)',n;'m (inputs)',m;'p (outputs)',p; ...
-                'N (horizon)',obj.N;'A',obj.A;'B',obj.B;'C',obj.C;'D',obj.D});
+            obj.printViewSection('Model',{'n (states)',n;'m (inputs)',m; ...
+                'N (horizon)',obj.N;'A',obj.A;'B',obj.B});
             obj.printViewSection('Weights',{'Q',obj.Q;'R',obj.R;'P',obj.P});
             obj.printViewSection('Terminal',{'Constraint enabled',~isempty(obj.Et); ...
                 'Constraint rows',size(obj.Et,1);'Et',obj.Et; ...

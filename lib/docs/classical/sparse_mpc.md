@@ -1,0 +1,3 @@
+- **Dense MPC**
+    - **Advantages**
+    - **Shortages**
