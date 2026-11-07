@@ -57,7 +57,7 @@ classdef terminal_designer < handle
             obj.logInfo("Terinal set designer is ready!");
         end
 
-        function design(obj,Kt_type,params)
+        function design(obj,Kt_type,params,ifplot)
             n = size(obj.A,1);
             % 确定增益
             switch lower(Kt_type)
@@ -89,7 +89,7 @@ classdef terminal_designer < handle
                     "Terminal region is unbounded; no terminal constraint is imposed.");
                 return
             end
-            if obj.ifPlot && n>=2 && n<=3
+            if obj.ifPlot && n>=2 && n<=3 && ifplot
                 fig = figure();
                 ctr.plots.plotEllipsoid(obj.M,obj.alpha,[],fig);
             end
@@ -97,7 +97,7 @@ classdef terminal_designer < handle
             % 终端约束线性化
             obj.logInfo("Terminal rigion linearized...");
             [obj.xt_min,obj.xt_max,obj.Et] = ctr.terminalSet_linear(obj.At,obj.M,obj.alpha);
-            if obj.ifPlot && n>=2 && n<=3
+            if obj.ifPlot && n>=2 && n<=3 && ifplot
                 ctr.plots.plotPolytope(obj.Et,obj.xt_min,obj.xt_max,[],fig);
             end
 

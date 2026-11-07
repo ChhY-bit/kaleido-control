@@ -1,10 +1,10 @@
-clear,clc%,close all
+clear,clc,%close all
 
 %% 参数设置
 % ========== 仿真参数 ==========
 dt = 1e-4;
 T = 20;
-ifDelay = false;
+ifDelay = 0;
 
 % ========== 系统参数 ==========
 Ac = [0,1;-1,-2];
@@ -13,7 +13,8 @@ Bc = [0;1];
 % ========== 控制参数 ==========
 Ts = 0.05;
 
-N = 50;
+N = 40
+;
 Q = diag([2,1]);
 R = 1;
 
@@ -21,12 +22,13 @@ W = diag([1,1]);
 epsilon = 0;
 
 warm_start = true;
+logger_on = false;
 
 % ========== 约束参数 =========
-x_min = 1*[-0.5;-0.2];
-x_max = 1*[1;0.2];
-u_min = -0.2;
-u_max = 0.2;
+x_min = 10*[-0.5;-0.2];
+x_max = 10*[1;0.2];
+u_min = -10;
+u_max = 10;
 
 % ========== 任务参数 ==========
 x_ini = [0.5;0];
@@ -34,8 +36,8 @@ x_ini = [0.5;0];
 % ========== 求解器 ==========
 settings = struct( ...
     'verbose', false, ...
-    'eps_abs', 1e-7, ...
-    'eps_rel', 1e-7, ...
+    'eps_abs', 1e-8, ...
+    'eps_rel', 1e-8, ...
     'max_iter', 20000);
 
 %% 初始化
@@ -57,14 +59,15 @@ U_ub = kron(ones(N,1),u_max);
 
 designer = ctr.terminal_designer(A,B,Q,R);
 designer.setParams(W,epsilon,[x_min,x_max],[u_min,u_max]);
-designer.design('lqr');
+designer.design('lqr',[],false);
 
 % controller = ctr.mpc_condensed;
 controller = ctr.mpc_sparse;
 controller.setProblem(A,B,N,Q,R);
-% controller.setTerminal(designer.P,designer.Kt,designer.Et,designer.xt_min,designer.xt_max);
+controller.setTerminal(designer.P,designer.Kt,designer.Et,designer.xt_min,designer.xt_max);
 controller.init;
 controller.setWarmStart(warm_start);
+controller.setLogger(logger_on);
 controller.setup('osqp',settings);
 
 %% 控制循环
@@ -89,15 +92,24 @@ for i = 1:length(tspan)-1
         solving_time(k) = controller.solving_time;
         cost_value(k) = controller.J;
         run_time(k) = toc;
-        if ~ifDelay
-            u(:,i) = u_temp;
-        else
-            % 求解结果延迟作用
-            if controller.solving_time > Ts %#ok<*UNRCH>
+        if ifDelay
+            % 模拟求解结果延迟作用
+            % delay_steps = ceil(controller.solving_time/dt);
+            delay_steps = ceil(run_time(k)/dt)+130;
+            if delay_steps >= round(Ts/dt) %#ok<*UNRCH>
                 error("Solving time too long!");
             end
-            % delayed_time = i + ceil(controller.solving_time/dt);    % 求解时间延迟
-            delayed_time = i + ceil(run_time(k)/dt);    % 运行时间延迟
+            delayed_time = i + delay_steps;
+            if delay_steps == 0
+                u(:,i) = u_temp;       % 当步执行
+            elseif i > 1
+                u(:,i) = u(:,i-1);     % 等待期间保持旧输入
+            else
+                u(:,i) = zeros(m,1);   % 首次等待期间的初始输入
+            end
+        else
+            delayed_time = i;
+            u(:,i) = u_temp;
         end
         
     else                            % ---------- 保持时刻 ----------
@@ -117,11 +129,13 @@ subplot(2,1,1)
 plot(tspan,x(1,:))
 xlabel('t / s')
 ylabel('x_1')
+hold on
 
 subplot(2,1,2)
 plot(tspan,x(2,:))
 xlabel('t / s')
 ylabel('x_2')
+hold on
 
 % 控制
 figure(2);
@@ -129,15 +143,23 @@ figure(2);
 plot(tspan,u)
 xlabel('t / s')
 ylabel('u')
+hold on
 
 % 求解
 figure(3)
-bar(1:k,run_time)
-hold on
-bar(1:k,solving_time)
-fprintf("[solving] warm: %d, avg: %.3f ms, max: %.3f ms.\n",warm_start,1000*mean(solving_time),1000*max(solving_time))
-fprintf("[running] warm: %d, avg: %.3f ms, max: %.3f ms.\n",warm_start,1000*mean(run_time),1000*max(run_time))
+clf
+bar(1:k,[run_time(1:k).',solving_time(1:k).'],'grouped')
+xlabel('Control step')
+ylabel('Time / s')
+legend('Running time','Solving time','Location','best')
+grid on
+fprintf("[solving] warm: %d, avg: %.3f ms, max: %.3f ms, freq_min = %.0f Hz.\n",...
+        warm_start,1000*mean(solving_time),1000*max(solving_time),1/max(solving_time))
+fprintf("[running] warm: %d, avg: %.3f ms, max: %.3f ms, freq_min = %.0f Hz.\n",...
+        warm_start,1000*mean(run_time),1000*max(run_time),1/max(run_time))
 
 % 代价
 figure(4)
 bar(1:k,cost_value)
+hold on
+
