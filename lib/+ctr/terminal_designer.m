@@ -72,12 +72,23 @@ classdef terminal_designer < handle
             end
             obj.At = obj.A + obj.B*obj.Kt;
 
+            % 终端代价权重
+            obj.P = dlyap(obj.At',obj.Q+obj.Kt'*obj.R*obj.Kt+obj.epsilon*eye(n));
+
             % 确定形状
             obj.logInfo("Terminal rigion generated...");
             obj.M = dlyap(obj.At',obj.W);
 
             % 确定大小
             obj.alpha = obj.computeAlpha;
+            if isinf(obj.alpha)
+                obj.Et = [];
+                obj.xt_min = [];
+                obj.xt_max = [];
+                obj.logWarning( ...
+                    "Terminal region is unbounded; no terminal constraint is imposed.");
+                return
+            end
             if obj.ifPlot && n>=2 && n<=3
                 fig = figure();
                 ctr.plots.plotEllipsoid(obj.M,obj.alpha,[],fig);
@@ -89,9 +100,6 @@ classdef terminal_designer < handle
             if obj.ifPlot && n>=2 && n<=3
                 ctr.plots.plotPolytope(obj.Et,obj.xt_min,obj.xt_max,[],fig);
             end
-
-            % 终端代价权重
-            obj.P = dlyap(obj.At',obj.Q+obj.Kt'*obj.R*obj.Kt+obj.epsilon*eye(n));
 
             obj.logInfo("Terminal ingredient designing done!");
         end

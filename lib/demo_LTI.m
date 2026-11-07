@@ -1,4 +1,4 @@
-clear,clc,%close all
+clear,clc%,close all
 
 %% 参数设置
 % ========== 仿真参数 ==========
@@ -7,34 +7,43 @@ T = 20;
 ifDelay = false;
 
 % ========== 系统参数 ==========
-Ac = [0,1;1,2];
+Ac = [0,1;-1,-2];
 Bc = [0;1];
 
 % ========== 控制参数 ==========
-Ts = 0.01;
-N = 30;
+Ts = 0.05;
+
+N = 50;
 Q = diag([2,1]);
 R = 1;
 
 W = diag([1,1]);
 epsilon = 0;
 
-warm_start = 1;
+warm_start = true;
 
 % ========== 约束参数 =========
-x_min = 1000*[-0.6;-0.1];
-x_max = 1000*[1;0.2];
-u_min = -1000;
-u_max = 1000;
+x_min = 1*[-0.5;-0.2];
+x_max = 1*[1;0.2];
+u_min = -0.2;
+u_max = 0.2;
 
 % ========== 任务参数 ==========
-x_ini = [0.5;-0.5];
+x_ini = [0.5;0];
+
+% ========== 求解器 ==========
+settings = struct( ...
+    'verbose', false, ...
+    'eps_abs', 1e-7, ...
+    'eps_rel', 1e-7, ...
+    'max_iter', 20000);
 
 %% 初始化
 % ---------- 系统初始化 ----------
 sys = c2d(ss(Ac,Bc,[],[]),Ts);
 A = sys.A;
 B = sys.B;
+
 tspan = 0:dt:T;
 [n,m] = size(B);
 dynamic_fun = @(x,u,t) Ac*x + Bc*u;
@@ -46,15 +55,17 @@ U_lb = kron(ones(N,1),u_min);
 U_ub = kron(ones(N,1),u_max);
 
 
-% designer = ctr.terminal_designer(A,B,Q,R);
-% designer.setParams(W,epsilon,[x_min,x_max],[u_min,u_max]);
-% designer.design('lqr');
+designer = ctr.terminal_designer(A,B,Q,R);
+designer.setParams(W,epsilon,[x_min,x_max],[u_min,u_max]);
+designer.design('lqr');
 
-controller = ctr.mpc;
+% controller = ctr.mpc_condensed;
+controller = ctr.mpc_sparse;
 controller.setProblem(A,B,N,Q,R);
 % controller.setTerminal(designer.P,designer.Kt,designer.Et,designer.xt_min,designer.xt_max);
 controller.init;
 controller.setWarmStart(warm_start);
+controller.setup('osqp',settings);
 
 %% 控制循环
 % ---------- 数据预分配 ----------
@@ -62,6 +73,7 @@ x = zeros(n,length(tspan));
 x(:,1) = x_ini;
 u = zeros(m,length(tspan));
 solving_time = zeros(1,round(T/Ts));
+run_time = zeros(1,round(T/Ts));
 cost_value = zeros(1,round(T/Ts));
 k = 0;
 
@@ -69,13 +81,14 @@ k = 0;
 for i = 1:length(tspan)-1
     t = tspan(i);
     if mod((i-1),round(Ts/dt)) == 0 % ---------- 控制时刻 ----------
+        tic;
         k = k+1;
-        controller.setup(x(:,i),X_lb,X_ub,U_lb,U_ub);
-        controller.solve('osqp',struct('verbose', false));
-        % controller.solve('osqp',[]);
+        controller.update(x(:,i),X_lb,X_ub,U_lb,U_ub);
+        controller.solve;
         u_temp = controller.U(:,1);
         solving_time(k) = controller.solving_time;
         cost_value(k) = controller.J;
+        run_time(k) = toc;
         if ~ifDelay
             u(:,i) = u_temp;
         else
@@ -83,8 +96,10 @@ for i = 1:length(tspan)-1
             if controller.solving_time > Ts %#ok<*UNRCH>
                 error("Solving time too long!");
             end
-            delayed_time = i + ceil(controller.solving_time/dt);
+            % delayed_time = i + ceil(controller.solving_time/dt);    % 求解时间延迟
+            delayed_time = i + ceil(run_time(k)/dt);    % 运行时间延迟
         end
+        
     else                            % ---------- 保持时刻 ----------
         if ifDelay && i == delayed_time
             u(:,i) = u_temp;    % 执行求解结果
@@ -117,8 +132,11 @@ ylabel('u')
 
 % 求解
 figure(3)
+bar(1:k,run_time)
+hold on
 bar(1:k,solving_time)
-fprintf("warm: %d, avg: %.3f ms, max: %.3f ms.",warm_start,1000*mean(solving_time),1000*max(solving_time))
+fprintf("[solving] warm: %d, avg: %.3f ms, max: %.3f ms.\n",warm_start,1000*mean(solving_time),1000*max(solving_time))
+fprintf("[running] warm: %d, avg: %.3f ms, max: %.3f ms.\n",warm_start,1000*mean(run_time),1000*max(run_time))
 
 % 代价
 figure(4)
