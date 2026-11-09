@@ -95,15 +95,29 @@ $$
 
 Practically, due to the noise when sampling data-set, the *Hankel* matrix can be of full rank too easily, which is not truely persistenly exciting in fact.
 
-Alternatively, the Singular Value Decomposition (SVD) technique can be used to identify the actual effective order of the persistenly excitation.
+Alternatively, the Singular Value Decomposition (SVD) technique can be used to identify (or reduce) the actual effective order (minimum dimension) of the persistenly excitation.
 
 We can firstly collect a large amount of data with the length of $K$ and decompose  them by
 
-$$V = \mathrm{SVD}\left(\mathcal{H}^\top_{K}(u^d) \mathcal{H}_{K}(u^d)\right)$$
+$$
+\begin{bmatrix}
+    \mathcal{H}_{L}(u^d) \\ \mathcal{H}_{L}(y^d)
+\end{bmatrix} = \underbrace{\begin{bmatrix} W_1 & W_2 \end{bmatrix}}_{W} \underbrace{\begin{bmatrix} \Sigma_1 & \\ & 0 \end{bmatrix}}_{\Sigma} \underbrace{\begin{bmatrix} V_1 \\ V_2 \end{bmatrix}}_{V},
+$$
 
-Then we can take the largest $L+n$ elements of $V$, where the $(L+n+1)$-th value is much less than the $L+n$-th.
+where $W^\top W = W W^\top = I_{(m+p)L},\;V^\top V = VV^\top = I_{S-L+1}.$, then the diagonal block $\Sigma_1\in\mathbb{R}^{r\times r}$ contains $r:=mL+n$ (non-zero) singular vlaues, which can fully represent the system with minimum dimensions. 
 
-Another challenge is to determine the system order $n$ (and its lag $l$, see <u> Data-Enabled Predictive Control: In the Shallows of the DeePC, ECC, 2019</u>) because of its unknowns. An acceptable method is using a sufficiently large upper bound $\bar{n} \ge n$ to replace $n$ and $l$.
+Moreover, the *Hankel* matrix containing the historical data can be significantly reduced by 
+
+$$
+\begin{bmatrix}
+\bar{\mathcal{H}}_{L}(u^d) \\ \bar{\mathcal{H}}_{L}(u^d)
+\end{bmatrix} = \begin{bmatrix}
+    \mathcal{H}_{L}(u^d) \\ \mathcal{H}_{L}(y^d)
+\end{bmatrix} V_1 = W_1 \Sigma_1 \in \mathbb{R}^{(m+p)L \times r}.
+$$
+
+Another challenge is to determine the system order $n$ (or its lag $l$, see <u> Data-Enabled Predictive Control: In the Shallows of the DeePC, ECC, 2019</u>) because of its unknowns. An acceptable method is using a sufficiently large upper bound $\bar{n} \ge n$ to replace $n$ and $l$.
 
 #### 2.1.2 Dimension Requirement
 
@@ -240,3 +254,7 @@ $$
 $$
 
 where $$\Lambda_\alpha := \lambda_\alpha I_{S-L+1},\quad \Lambda_u := \lambda_u I_{mT},\quad \Lambda_y := \lambda_y I_{pT},$$ with $\lambda_\alpha \ge 0$ being the regulation weight and $\lambda_u>0,\lambda_y>0$ being both sufficiently large constant.
+
+### 3.3 Extending to Nonlinear Case
+
+## 4 Algorithm of DeePC
