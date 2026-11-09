@@ -1,4 +1,4 @@
-clear,clc,%close all
+clear,clc,close all
 
 %% 参数设置
 % ========== 仿真参数 ==========
@@ -7,13 +7,13 @@ T = 20;
 ifDelay = 0;
 
 % ========== 系统参数 ==========
-Ac = [0,1;-1,-2];
+Ac = [0,1;1,2];
 Bc = [0;1];
 
 % ========== 控制参数 ==========
 Ts = 0.05;
 
-N = 40;
+N = 100;
 Q = diag([2,1]);
 R = 1;
 
@@ -24,10 +24,10 @@ warm_start = true;
 logger_on = false;
 
 % ========== 约束参数 =========
-x_min = 10*[-0.5;-0.2];
-x_max = 10*[1;0.2];
-u_min = -10;
-u_max = 10;
+x_min = [-1;-0.1];
+x_max = [1;0.1];
+u_min = -1;
+u_max = 1;
 
 % ========== 任务参数 ==========
 x_ini = [0.5;0];
@@ -74,6 +74,7 @@ controller.setup('osqp',settings);
 x = zeros(n,length(tspan));
 x(:,1) = x_ini;
 u = zeros(m,length(tspan));
+delay_flag = zeros(1,length(tspan));    % 记录延迟时刻
 solving_time = zeros(1,round(T/Ts));
 run_time = zeros(1,round(T/Ts));
 cost_value = zeros(1,round(T/Ts));
@@ -94,27 +95,36 @@ for i = 1:length(tspan)-1
         if ifDelay
             % 模拟求解结果延迟作用
             % delay_steps = ceil(controller.solving_time/dt);
-            delay_steps = ceil(run_time(k)/dt)+130;
-            if delay_steps >= round(Ts/dt) %#ok<*UNRCH>
-                error("Solving time too long!");
+            delay_steps = ceil(run_time(k)/dt)+5000; %#ok<*UNRCH>
+            if i+delay_steps <= length(tspan)
+                u(:,i+delay_steps) = u_temp;
             end
-            delayed_time = i + delay_steps;
-            if delay_steps == 0
-                u(:,i) = u_temp;       % 当步执行
-            elseif i > 1
-                u(:,i) = u(:,i-1);     % 等待期间保持旧输入
-            else
-                u(:,i) = zeros(m,1);   % 首次等待期间的初始输入
+            if i > 1 && ~delay_flag(i)
+                u(:,i) = u(:,i-1);
             end
+            delay_flag(i+delay_steps) = 1;
+            
+            % if delay_steps >= round(Ts/dt) %
+            %     error("Solving time too long!");
+            % end
+            % delayed_time = i + delay_steps;
+            % if delay_steps == 0
+            %     u(:,i) = u_temp;       % 当步执行
+            % elseif i > 1
+            %     u(:,i) = u(:,i-1);     % 等待期间保持旧输入
+            % else
+            %     u(:,i) = zeros(m,1);   % 首次等待期间的初始输入
+            % end
         else
-            delayed_time = i;
+            % delayed_time = i;
             u(:,i) = u_temp;
         end
         
     else                            % ---------- 保持时刻 ----------
-        if ifDelay && i == delayed_time
-            u(:,i) = u_temp;    % 执行求解结果
-        else
+        % if ifDelay && i == delayed_time
+        %     u(:,i) = u_temp;    % 执行求解结果
+        % else
+        if ~delay_flag(i)
             u(:,i) = u(:,i-1);  % 保持
         end
     end
