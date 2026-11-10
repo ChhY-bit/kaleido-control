@@ -1,19 +1,21 @@
-clear,clc,close all
+clear,clc,%close all
 
+% save_dir = 'C:\Users\BIT_robot\Desktop\delay_test';
+% save_name = 'no_delay.mat';
 %% 参数设置
 % ========== 仿真参数 ==========
 dt = 1e-4;
-T = 20;
+T = 10;
 ifDelay = 0;
 
 % ========== 系统参数 ==========
-Ac = [0,1;1,2];
-Bc = [0;1];
+Ac = [1,0;0,2];
+Bc = [1;1];
 
 % ========== 控制参数 ==========
 Ts = 0.05;
 
-N = 100;
+N = 40;
 Q = diag([2,1]);
 R = 1;
 
@@ -24,10 +26,10 @@ warm_start = true;
 logger_on = false;
 
 % ========== 约束参数 =========
-x_min = [-1;-0.1];
-x_max = [1;0.1];
-u_min = -1;
-u_max = 1;
+x_min = [-2;-1];
+x_max = [2;1];
+u_min = -1.5;
+u_max = 1.5;
 
 % ========== 任务参数 ==========
 x_ini = [0.5;0];
@@ -37,7 +39,7 @@ settings = struct( ...
     'verbose', false, ...
     'eps_abs', 1e-8, ...
     'eps_rel', 1e-8, ...
-    'max_iter', 20000);
+    'max_iter', 50000);
 
 %% 初始化
 % ---------- 系统初始化 ----------
@@ -87,6 +89,11 @@ for i = 1:length(tspan)-1
         tic;
         k = k+1;
         controller.update(x(:,i),X_lb,X_ub,U_lb,U_ub);
+        % ----- 前向预测补偿延迟 -----
+        % sys_p = d2d(sys,500*dt);
+        % Ap = sys_p.A; Bp = sys_p.B;
+        % controller.update(Ap*x(:,i)+Bp*u(:,i),X_lb,X_ub,U_lb,U_ub);
+        % ----------------------------
         controller.solve;
         u_temp = controller.U(:,1);
         solving_time(k) = controller.solving_time;
@@ -95,7 +102,7 @@ for i = 1:length(tspan)-1
         if ifDelay
             % 模拟求解结果延迟作用
             % delay_steps = ceil(controller.solving_time/dt);
-            delay_steps = ceil(run_time(k)/dt)+5000; %#ok<*UNRCH>
+            delay_steps = 0*ceil(run_time(k)/dt)+500; %#ok<*UNRCH>
             if i+delay_steps <= length(tspan)
                 u(:,i+delay_steps) = u_temp;
             end
@@ -172,3 +179,10 @@ figure(4)
 bar(1:k,cost_value)
 hold on
 
+%% 保存数据
+% if ~isfolder(save_dir)
+%     mkdir(save_dir);
+% end
+% save_path = fullfile(save_dir,save_name);
+% save(save_path,'x','u','tspan');
+% fprintf('[save] Data saved to: %s\n',save_path);
