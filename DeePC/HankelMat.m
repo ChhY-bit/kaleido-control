@@ -9,11 +9,7 @@ function [H,r,row] = HankelMat(order,signal)
     % 统一为 double，避免整数类型参与维度计算时发生饱和或类型冲突。
     order = double(order);
     window_lenth = T-order+1;
-    if (window_lenth<m*order)
-        error('Hankel:TooFewSamples', ...
-            'Too few samples: T must be >= (m+1)*order-1 (T>=%d or order<=%d).', ...
-            (m+1)*order-1, floor((T+1)/(m+1)));
-    end
+    % 构造 Hankel 矩阵不要求满行秩；持续激励条件应另行检查输入数据。
     H = zeros(m*order,window_lenth);
     for i = 1:window_lenth
         for j = 1:order
