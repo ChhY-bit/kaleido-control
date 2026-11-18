@@ -40,14 +40,15 @@
     controller.init(u_d,y_d);  % 传入数据
     ```
 
-#### (optional) deepc.samplify(ratio,ifplot)
-- `ratio` - 奇异值截断比（默认 `10`）
-- `ifplot` - 是否绘制 SVD 结果
-- 作用：对数据信息进行降维，剔除噪声，保留最少的生成向量
-- 注意：必须在 `.init()` 之后使用
+#### (optional) deepc.samplify(r,ifplot)
+- `r` - 手动指定的保留维数，必须为正整数，且不超过当前输入、输出 Hankel 矩阵纵向拼接后的奇异值数量
+- `ifplot` - 是否绘制截断前的 SVD 结果并标记位置 `r`（默认 `false`）
+- 作用：保留前 `r` 个奇异值方向，对数据进行降维，并返回 `r`；截断位置由使用者判断
+- 注意：必须在 `.init()` 之后使用；重复调用会基于已经截断的数据操作，重新选择更大的 `r` 前需调用 `.init()` 恢复原始数据
+- 注意：参数无效时，报错且不修改控制器数据
 - 示例：
     ```matlab
-    controller.samplify(10,flase);  % 不开启绘图
+    r = controller.samplify(143,true);  % 保留前 143 个方向，并标记截断位置
     ```
 
 #### deepc.setup(solver_name,settings)
@@ -58,7 +59,7 @@
 - 示例：
     ```matlab
     controller.init(u_d,y_d);
-    controller.samplify(10,flase);
+    controller.samplify(143,false);
     controller.setup('osqp',[]);    % 使用OSQP求解器，一般 [] 表示默认设定
     ```
 

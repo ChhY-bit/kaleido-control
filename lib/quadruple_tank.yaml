@@ -1,0 +1,35 @@
+# 四水箱容器默认参数
+
+# 水箱截面积 [m^2]
+TankArea_1: 2.8
+TankArea_2: 3.2
+TankArea_3: 2.8
+TankArea_4: 3.2
+
+# 出水孔截面积 [m^2]
+HoleArea_1: 0.071
+HoleArea_2: 0.057
+HoleArea_3: 0.071
+HoleArea_4: 0.057
+
+# 重力加速度 [m/s^2]
+g: 9.81
+
+# 阀门分配比
+gamma_1: 0.2
+gamma_2: 0.3
+
+# 约束参数
+## 水箱高度 [m]
+TankHeight_1: 1.2
+TankHeight_2: 1.5
+TankHeight_3: 1.2
+TankHeight_4: 1.5
+## 最大进水量 [m^3/s]
+PumpMaxFlow_1: 5
+PumpMaxFlow_2: 5
+
+# 其他参数
+## 进水流速（影响进水孔径） [m/s]
+PumpFlowSpeed_1: 1.0
+PumpFlowSpeed_2: 1.0

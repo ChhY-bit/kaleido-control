@@ -1,184 +1,189 @@
-clear,clc,%close all
+clear,clc,close all
 
-% save_dir = 'C:\Users\BIT_robot\Desktop\delay_test';
-% save_name = 'no_delay.mat';
+%% 仿真设置
+dt = 1e-3;      % 仿真步长
+rng(123);
+
 %% 参数设置
-% ========== 仿真参数 ==========
-dt = 1e-4;
+
+% 被控对象模型
+yaml_filepath = "quadruple_tank.yaml";  % 参数路径
+state_ini = [0.2;0.3;0.1;0.4];          % 初始状态（水位[m]）
+
+% 控制器参数
+Ts = 0.02;          % 控制周期
+N = 30;             % 预测步数
+T_ini = 10;         % 初始长度
+Q = diag([10,10]);    % 输出权重
+R = diag([1,1]);    % 输入权重
+lambda_u = 1e4;
+lambda_y = 1e4;
+lambda_a = 1e2;
+
+% 离线收集数据
+S = 400;           % 数据样本数
+exciting_mode = 0;  % 0:rand    1:freq_sweep    2:test
+    amplitude = 0.5;  % 扫频最大值（信号范围[0,amplitude]）
+    omega_min = 0;  % 扫频最小值
+    omega_max = 10; % 扫频最大值
+    phase = pi/2;   % 2个输入之间的相位差
+
+% 在线控制
 T = 10;
 
-% ========== 系统参数 ==========
-Ac = [1,0;0,2];
-Bc = [1;1];
+ur = [0;0];
+% yr = [0.5;0.1;0.2;0.3];
+yr = [0.65;0.77];
 
-% ========== 控制参数 ==========
-Ts = 0.05;
+%% 离线收集数据
 
-N = 40;
-Q = diag([2,1]);
-R = 1;
+% 被控对象初始化
+params = rpm.utils.load_quadruple_tank_params(yaml_filepath);
+tanks = rpm.quadruple_tank(params,state_ini);
+C = [eye(2),zeros(2)];  % 输出矩阵
+% C = eye(4);
 
-warm_start = true;
-logger_on = false;
+% 信号初始化
+T_ext = S*Ts;   % 总激励时长
+tspan_ext = 0:dt:T_ext;
+u_ext = zeros(2,length(tspan_ext));
+x_ext = zeros(4,length(tspan_ext));
+    x_ext(:,1) = state_ini;
+y_ext = zeros(size(C,1),length(tspan_ext));
+    y_ext(:,1) = C*state_ini;
 
-% ========== 约束参数 =========
-x_min = [-2;-1];
-x_max = [2;1];
-u_min = -1.5;
-u_max = 1.5;
+% 确定激励信号模式
+omega_spd = (omega_max-omega_min)/T_ext;
+switch exciting_mode
+    case 0
+        signal = @(t) amplitude*rand();
+    case 1
+        signal = @(t) amplitude.*(0.5*...
+                      cos((omega_min+0.5*omega_spd.*t).*t)+0.5);
+    case 2  % 测试
+        signal = @(t) (2*rand()-1)*amplitude;
+end
 
-% ========== 任务参数 ==========
-x_ini = [0.5;0];
 
-% ========== 求解器 ==========
+for i=1:length(tspan_ext)-1
+    t = tspan_ext(i);       % 当前时刻
+    if mod((i-1),round(Ts/dt)) == 0
+        % 进入控制周期：更新
+        u_ext(:,i) = [signal(t);...
+                      signal(t+phase)]; % 输入信号样本
+    else
+        % 非控制周期：保持
+        u_ext(:,i) = u_ext(:,i-1);
+    end
+
+    % 仿真推进
+    tanks.send(u_ext(1,i),u_ext(2,i));
+    tanks.step(dt,t);
+    x_ext(:,i+1) = [tanks.x1;tanks.x2;tanks.x3;tanks.x4];
+    y_ext(:,i+1) = C*x_ext(:,i+1);
+end
+
+% 预览数据
+figure
+plot(tspan_ext,u_ext)
+
+figure
+plot(tspan_ext,y_ext)
+
+% 抽取数据
+u_data = u_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
+y_data = y_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
+
+% 加噪
+% u_data = u_data + 0.02*rand(size(u_data,1),size(u_data,2));
+% y_data = y_data + 0.02*rand(size(y_data,1),size(y_data,2));
+
+figure
+plot(1:size(u_data,2),u_data)
+
+figure
+plot(1:size(y_data,2),y_data)
+
+% 渲染画面
+% rander_tanks(x_ext, u_ext, params, dt, 10, 'sampling.gif');
+
+%% 在线控制
+
+% 对象初始化
+tanks.reset(state_ini);
+Y_lb = C*zeros(4,1);
+Y_ub = C*[params.TankHeight_1;params.TankHeight_2;...
+        params.TankHeight_3;params.TankHeight_4];
+U_lb = zeros(2,1);
+U_ub = [params.PumpMaxFlow_1;params.PumpMaxFlow_2];
+
+% 控制器初始化
 settings = struct( ...
     'verbose', false, ...
     'eps_abs', 1e-8, ...
     'eps_rel', 1e-8, ...
     'max_iter', 50000);
 
-%% 初始化
-% ---------- 系统初始化 ----------
-sys = c2d(ss(Ac,Bc,[],[]),Ts);
-A = sys.A;
-B = sys.B;
-
-tspan = 0:dt:T;
-[n,m] = size(B);
-dynamic_fun = @(x,u,t) Ac*x + Bc*u;
-
-% ---------- 约束初始化 ----------
-X_lb = kron(ones(N,1),x_min);
-X_ub = kron(ones(N,1),x_max);
-U_lb = kron(ones(N,1),u_min);
-U_ub = kron(ones(N,1),u_max);
-
-
-designer = ctr.terminal_designer(A,B,Q,R);
-designer.setParams(W,epsilon,[x_min,x_max],[u_min,u_max]);
-designer.design('lqr',[],false);
-
-% controller = ctr.mpc_condensed;
-controller = ctr.mpc_sparse;
-controller.setProblem(A,B,N,Q,R);
-controller.setTerminal(designer.P,designer.Kt,designer.Et,designer.xt_min,designer.xt_max);
-controller.init;
-controller.setWarmStart(warm_start);
-controller.setLogger(logger_on);
+controller = ctr.deepc(N,T_ini);
+controller.setParams(Q,R,lambda_u,lambda_y,lambda_a);
+controller.init(u_data,y_data);
+controller.samplify(81,true);  % 手动指定保留奇异值
 controller.setup('osqp',settings);
+controller.setLogger(false);
+
+% 数据初始化
+tspan = 0:dt:T;
+x = zeros(4,length(T));
+    x(:,1) = state_ini;
+u = zeros(2,length(tspan));
+y = zeros(size(C,1),length(tspan));
+    y(:,1) = C*state_ini;
+
+u_rec = zeros(2,round(T/Ts));
+y_rec = zeros(size(C,1),round(T/Ts));
 
 %% 控制循环
-% ---------- 数据预分配 ----------
-x = zeros(n,length(tspan));
-x(:,1) = x_ini;
-u = zeros(m,length(tspan));
-delay_flag = zeros(1,length(tspan));    % 记录延迟时刻
-solving_time = zeros(1,round(T/Ts));
-run_time = zeros(1,round(T/Ts));
-cost_value = zeros(1,round(T/Ts));
-k = 0;
-
-% ---------- 仿真循环 ----------
+k = 0;  % 数据样本计数器
 for i = 1:length(tspan)-1
     t = tspan(i);
-    if mod((i-1),round(Ts/dt)) == 0 % ---------- 控制时刻 ----------
-        tic;
+    if mod((i-1),round(Ts/dt)) == 0
         k = k+1;
-        controller.update(x(:,i),X_lb,X_ub,U_lb,U_ub);
-        % ----- 前向预测补偿延迟 -----
-        % sys_p = d2d(sys,500*dt);
-        % Ap = sys_p.A; Bp = sys_p.B;
-        % controller.update(Ap*x(:,i)+Bp*u(:,i),X_lb,X_ub,U_lb,U_ub);
-        % ----------------------------
-        controller.solve;
-        u_temp = controller.U(:,1);
-        solving_time(k) = controller.solving_time;
-        cost_value(k) = controller.J;
-        run_time(k) = toc;
-        if ifDelay
-            % 模拟求解结果延迟作用
-            % delay_steps = ceil(controller.solving_time/dt);
-            delay_steps = 0*ceil(run_time(k)/dt)+500; %#ok<*UNRCH>
-            if i+delay_steps <= length(tspan)
-                u(:,i+delay_steps) = u_temp;
-            end
-            if i > 1 && ~delay_flag(i)
-                u(:,i) = u(:,i-1);
-            end
-            delay_flag(i+delay_steps) = 1;
+        if k >= T_ini % 此前初始样本数不足
+            % 进入控制周期：更新
+            u_ini = u_rec(:,k-T_ini+1:k);
+            y_ini = y_rec(:,k-T_ini+1:k);
+            controller.update(u_ini(:),y_ini(:),...
+                              kron(ones(N,1),ur),kron(ones(N,1),yr),...
+                              kron(ones(N,1),Y_lb),kron(ones(N,1),Y_ub),...
+                              kron(ones(N,1),U_lb),kron(ones(N,1),U_ub));
+            controller.solve;
+            u(:,i) = controller.u_series(:,1);
             
-            % if delay_steps >= round(Ts/dt) %
-            %     error("Solving time too long!");
-            % end
-            % delayed_time = i + delay_steps;
-            % if delay_steps == 0
-            %     u(:,i) = u_temp;       % 当步执行
-            % elseif i > 1
-            %     u(:,i) = u(:,i-1);     % 等待期间保持旧输入
-            % else
-            %     u(:,i) = zeros(m,1);   % 首次等待期间的初始输入
-            % end
-        else
-            % delayed_time = i;
-            u(:,i) = u_temp;
+            % 离散信息
+            u_rec(:,k) = u(:,i);
+            y_rec(:,k) = y(:,i);
         end
-        
-    else                            % ---------- 保持时刻 ----------
-        % if ifDelay && i == delayed_time
-        %     u(:,i) = u_temp;    % 执行求解结果
-        % else
-        if ~delay_flag(i)
-            u(:,i) = u(:,i-1);  % 保持
-        end
+    else
+        % 非控制周期：保持
+        u(:,i) = u(:,i-1);
     end
-    x(:,i+1) = ctr.update_rk4(dynamic_fun,x(:,i),u(:,i),t,dt);
+    % 仿真推进
+    u_act = clip(u(:,i),U_lb,U_ub);
+    tanks.send(u_act(1),u_act(2));
+    tanks.step(dt,t);
+    x(:,i+1) = [tanks.x1;tanks.x2;tanks.x3;tanks.x4];
+    y(:,i+1) = C*x(:,i+1);
 end
 
-%% 结果绘制
-% 状态
-figure(1);
+figure
 subplot(2,1,1)
-plot(tspan,x(1,:))
-xlabel('t / s')
-ylabel('x_1')
+plot(tspan,y(1,:))
 hold on
-
+plot(tspan,yr(1).*ones(2,length(tspan)),'--r');
 subplot(2,1,2)
-plot(tspan,x(2,:))
-xlabel('t / s')
-ylabel('x_2')
+plot(tspan,y(2,:))
 hold on
+plot(tspan,yr(2).*ones(2,length(tspan)),'--r');
 
-% 控制
-figure(2);
-
+figure
 plot(tspan,u)
-xlabel('t / s')
-ylabel('u')
-hold on
-
-% 求解
-figure(3)
-clf
-bar(1:k,[run_time(1:k).',solving_time(1:k).'],'grouped')
-xlabel('Control step')
-ylabel('Time / s')
-legend('Running time','Solving time','Location','best')
-grid on
-fprintf("[solving] warm: %d, avg: %.3f ms, max: %.3f ms, freq_min = %.0f Hz.\n",...
-        warm_start,1000*mean(solving_time),1000*max(solving_time),1/max(solving_time))
-fprintf("[running] warm: %d, avg: %.3f ms, max: %.3f ms, freq_min = %.0f Hz.\n",...
-        warm_start,1000*mean(run_time),1000*max(run_time),1/max(run_time))
-
-% 代价
-figure(4)
-bar(1:k,cost_value)
-hold on
-
-%% 保存数据
-% if ~isfolder(save_dir)
-%     mkdir(save_dir);
-% end
-% save_path = fullfile(save_dir,save_name);
-% save(save_path,'x','u','tspan');
-% fprintf('[save] Data saved to: %s\n',save_path);

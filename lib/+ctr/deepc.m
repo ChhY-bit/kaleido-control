@@ -18,8 +18,6 @@ classdef deepc < handle
         lambda_y = 1e4    % 输出松弛项正则化系数
         lambda_a = 1e2    % alpha项松弛正则化系数
 
-        ratio=10;   % 拐点阈值比例
-
         % ========== 中间变量 ==========
         QQ      % 增广输出权重矩阵
         RR      % 增广输入权重矩阵
@@ -113,26 +111,26 @@ classdef deepc < handle
             obj.resetSolver();
         end
 
-        function r = samplify(obj,ratio,ifplot)
+        function r = samplify(obj,r,ifplot)
+            %SAMPLIFY 按指定维数 r 对 Hankel 矩阵进行 SVD 截断。
+            %   r = obj.samplify(r,ifplot) 保留前 r 个奇异值方向并返回 r。
+            %   r 必须为正整数，且不超过当前拼接 Hankel 矩阵的奇异值数量。
+            %   ifplot 默认为 false；为 true 时绘制截断前的奇异值并标记 r。
+            %   重新选择更大的 r 前，需调用 init 恢复原始数据。
+            narginchk(2,3);
             if isempty(obj.Hankel_u)
                 obj.logError('Call .init() before .samplify().');
-            end
-            if nargin < 2
-                ratio = obj.ratio;
             end
             if nargin < 3
                 ifplot = false;
             end
-            validateattributes(ratio,{'numeric'},{'scalar','real','finite','>',1},mfilename,'ratio');
+            Hankel = [obj.Hankel_u;obj.Hankel_y];
+            validateattributes(r,{'numeric'}, ...
+                {'scalar','real','finite','integer','positive','<=',min(size(Hankel))}, ...
+                mfilename,'r');
             validateattributes(ifplot,{'logical','numeric'},{'scalar','binary'},mfilename,'ifplot');
-            [W,Sigma,~] = svd([obj.Hankel_u;obj.Hankel_y],'econ');
-            sigma = diag(Sigma)+eps;
-            r = length(sigma);
-            for i = 1:length(sigma)-1
-                if sigma(i)/sigma(i+1) >= ratio
-                    r = i;
-                end
-            end
+            r = double(r);
+            [W,Sigma,~] = svd(Hankel,'econ');
             Hkl = W(:,1:r)*Sigma(1:r,1:r);
             obj.Hankel_u = Hkl(1:obj.m*(obj.N+obj.T_ini),1:r);
             obj.Hankel_y = Hkl(obj.m*(obj.N+obj.T_ini)+1:(obj.m+obj.p)*(obj.N+obj.T_ini),1:r);
@@ -141,7 +139,8 @@ classdef deepc < handle
             obj.resetSolver();
 
             if ifplot
-                ctr.plots.plotSVD(sigma);
+                sigma = diag(Sigma)+eps;
+                ctr.plots.plotSVD(sigma,r);
             end
         end
 
