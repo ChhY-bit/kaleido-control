@@ -1,121 +1,79 @@
 clear,clc,close all
 
 %% 仿真设置
-dt = 1e-3;      % 仿真步长
 rng(123);
 
 %% 参数设置
 
 % 被控对象模型
-yaml_filepath = "quadruple_tank.yaml";  % 参数路径
-state_ini = [0.2;0.3;0.1;0.4];          % 初始状态（水位[m]）
+A = [0.921, 0.000, 0.041, 0.000;...
+                 0.000, 0.918, 0.000, 0.033;...
+                 0.000, 0.000, 0.924, 0.000;...
+                 0.000, 0.000, 0.000, 0.937];
+B = [0.017, 0.001;...
+     0.001, 0.023;...
+     0.000, 0.061;...
+     0.072, 0.000];
+
+C = [1,0,0,0; 0,1,0,0];
+
+state_ini = [0;0;0;0];          % 初始状态
 
 % 控制器参数
-Ts = 0.02;          % 控制周期
 N = 30;             % 预测步数
 T_ini = 10;         % 初始长度
-Q = diag([10,10]);    % 输出权重
-R = diag([1,1]);    % 输入权重
-lambda_u = 1e4;
+Q = diag([35,35]);    % 输出权重
+% R = diag([1e-4,1e-4]);    % 输入权重
+R = diag([10,10]);    % 输入权重
+lambda_u = 1e6;
 lambda_y = 1e4;
-lambda_a = 1e2;
+lambda_a = 0;
+
+Y_lb = [-2;-2];
+Y_ub = [2;2];
+U_lb = [-2;-2];
+U_ub = [2;2];
 
 % 离线收集数据
 S = 400;           % 数据样本数
-exciting_mode = 0;  % 0:rand    1:freq_sweep    2:test
-    amplitude = 0.5;  % 扫频最大值（信号范围[0,amplitude]）
-    omega_min = 0;  % 扫频最小值
-    omega_max = 10; % 扫频最大值
-    phase = pi/2;   % 2个输入之间的相位差
+amplitude = 3;
+
 
 % 在线控制
-T = 10;
+T = 200;    % 步数
 
-ur = [0;0];
-% yr = [0.5;0.1;0.2;0.3];
-yr = [0.65;0.77];
+ur = [0.22694;1.40062];
+% ur = [0;0];
+yr = [0.65;0.5];
 
 %% 离线收集数据
 
-% 被控对象初始化
-params = rpm.utils.load_quadruple_tank_params(yaml_filepath);
-tanks = rpm.quadruple_tank(params,state_ini);
-C = [eye(2),zeros(2)];  % 输出矩阵
-% C = eye(4);
-
 % 信号初始化
-T_ext = S*Ts;   % 总激励时长
-tspan_ext = 0:dt:T_ext;
-u_ext = zeros(2,length(tspan_ext));
-x_ext = zeros(4,length(tspan_ext));
+u_ext = (2*rand(2,S)-1)*amplitude;
+x_ext = zeros(4,S);
     x_ext(:,1) = state_ini;
-y_ext = zeros(size(C,1),length(tspan_ext));
+y_ext = zeros(2,S);
     y_ext(:,1) = C*state_ini;
 
-% 确定激励信号模式
-omega_spd = (omega_max-omega_min)/T_ext;
-switch exciting_mode
-    case 0
-        signal = @(t) amplitude*rand();
-    case 1
-        signal = @(t) amplitude.*(0.5*...
-                      cos((omega_min+0.5*omega_spd.*t).*t)+0.5);
-    case 2  % 测试
-        signal = @(t) (2*rand()-1)*amplitude;
+for k=1:S-1
+    x_ext(:,k+1) = A*x_ext(:,k) + B*u_ext(:,k);
+    y_ext(:,k+1) = C*x_ext(:,k+1);
 end
 
+u_data = u_ext;
+y_data = y_ext;
 
-for i=1:length(tspan_ext)-1
-    t = tspan_ext(i);       % 当前时刻
-    if mod((i-1),round(Ts/dt)) == 0
-        % 进入控制周期：更新
-        u_ext(:,i) = [signal(t);...
-                      signal(t+phase)]; % 输入信号样本
-    else
-        % 非控制周期：保持
-        u_ext(:,i) = u_ext(:,i-1);
-    end
-
-    % 仿真推进
-    tanks.send(u_ext(1,i),u_ext(2,i));
-    tanks.step(dt,t);
-    x_ext(:,i+1) = [tanks.x1;tanks.x2;tanks.x3;tanks.x4];
-    y_ext(:,i+1) = C*x_ext(:,i+1);
-end
+% 加噪
+% u_data = u_data + 0.002*(2*rand(size(y_data))-1);
+% y_data = y_data + 0.002*(2*rand(size(y_data))-1);
 
 % 预览数据
 figure
-plot(tspan_ext,u_ext)
-
-figure
-plot(tspan_ext,y_ext)
-
-% 抽取数据
-u_data = u_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
-y_data = y_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
-
-% 加噪
-% u_data = u_data + 0.02*rand(size(u_data,1),size(u_data,2));
-% y_data = y_data + 0.02*rand(size(y_data,1),size(y_data,2));
-
-figure
 plot(1:size(u_data,2),u_data)
-
 figure
 plot(1:size(y_data,2),y_data)
 
-% 渲染画面
-% rander_tanks(x_ext, u_ext, params, dt, 10, 'sampling.gif');
-
 %% 在线控制
-
-% 对象初始化
-tanks.reset(state_ini);
-Y_lb = C*zeros(4,1);
-Y_ub = C*[params.TankHeight_1;params.TankHeight_2;...
-        params.TankHeight_3;params.TankHeight_4];
-U_lb = zeros(2,1);
-U_ub = [params.PumpMaxFlow_1;params.PumpMaxFlow_2];
 
 % 控制器初始化
 settings = struct( ...
@@ -127,63 +85,42 @@ settings = struct( ...
 controller = ctr.deepc(N,T_ini);
 controller.setParams(Q,R,lambda_u,lambda_y,lambda_a);
 controller.init(u_data,y_data);
-controller.samplify(81,true);  % 手动指定保留奇异值
+controller.samplify(84,true);  % 手动指定保留奇异值
 controller.setup('osqp',settings);
 controller.setLogger(false);
 
 % 数据初始化
-tspan = 0:dt:T;
-x = zeros(4,length(T));
+x = zeros(4,T);
     x(:,1) = state_ini;
-u = zeros(2,length(tspan));
-y = zeros(size(C,1),length(tspan));
+u = zeros(2,T);
+y = zeros(2,T);
     y(:,1) = C*state_ini;
 
-u_rec = zeros(2,round(T/Ts));
-y_rec = zeros(size(C,1),round(T/Ts));
-
 %% 控制循环
-k = 0;  % 数据样本计数器
-for i = 1:length(tspan)-1
-    t = tspan(i);
-    if mod((i-1),round(Ts/dt)) == 0
-        k = k+1;
-        if k >= T_ini % 此前初始样本数不足
-            % 进入控制周期：更新
-            u_ini = u_rec(:,k-T_ini+1:k);
-            y_ini = y_rec(:,k-T_ini+1:k);
-            controller.update(u_ini(:),y_ini(:),...
-                              kron(ones(N,1),ur),kron(ones(N,1),yr),...
-                              kron(ones(N,1),Y_lb),kron(ones(N,1),Y_ub),...
-                              kron(ones(N,1),U_lb),kron(ones(N,1),U_ub));
-            controller.solve;
-            u(:,i) = controller.u_series(:,1);
-            
-            % 离散信息
-            u_rec(:,k) = u(:,i);
-            y_rec(:,k) = y(:,i);
-        end
-    else
-        % 非控制周期：保持
-        u(:,i) = u(:,i-1);
+for k = 1:T-1
+    if k >= T_ini+1 % 此前初始样本数不足
+        % 进入控制周期：更新
+        u_ini = u(:,k-T_ini:k-1);
+        y_ini = y(:,k-T_ini:k-1);
+        controller.update(u_ini(:),y_ini(:),...
+                          kron(ones(N,1),ur),kron(ones(N,1),yr),...
+                          kron(ones(N,1),Y_lb),kron(ones(N,1),Y_ub),...
+                          kron(ones(N,1),U_lb),kron(ones(N,1),U_ub));
+        controller.solve;
+        u(:,k) = controller.u_series(:,1);
     end
     % 仿真推进
-    u_act = clip(u(:,i),U_lb,U_ub);
-    tanks.send(u_act(1),u_act(2));
-    tanks.step(dt,t);
-    x(:,i+1) = [tanks.x1;tanks.x2;tanks.x3;tanks.x4];
-    y(:,i+1) = C*x(:,i+1);
+    u_act = clip(u(:,k),U_lb,U_ub);
+    x(:,k+1) = A*x(:,k) + B*u_act;
+    y(:,k+1) = C*x(:,k+1);
 end
 
 figure
-subplot(2,1,1)
-plot(tspan,y(1,:))
+plot(1:T,y(1,:),'b'); 
 hold on
-plot(tspan,yr(1).*ones(2,length(tspan)),'--r');
-subplot(2,1,2)
-plot(tspan,y(2,:))
-hold on
-plot(tspan,yr(2).*ones(2,length(tspan)),'--r');
+plot(1:T,yr(1).*ones(2,T),'--b');
+plot(1:T,y(2,:),'r');
+plot(1:T,yr(2).*ones(2,T),'--r');
 
 figure
-plot(tspan,u)
+plot(1:T,u)
