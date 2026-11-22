@@ -1,24 +1,25 @@
 clear,clc,close all
 
 %% 仿真设置
-dt = 1e-3;      % 仿真步长
+dt = 1e-4;      % 仿真步长
 rng(123);
 
 %% 参数设置
 
 % 被控对象模型
 yaml_filepath = "quadruple_tank.yaml";  % 参数路径
-state_ini = [0.2;0.3;0.1;0.4];          % 初始状态（水位[m]）
+% state_ini = [0.2;0.3;0.1;0.4];          % 初始状态（水位[m]）
+state_ini = [0;0;0;0];
 
 % 控制器参数
 Ts = 0.02;          % 控制周期
 N = 20;             % 预测步数
 T_ini = 10;         % 初始长度
 Q = diag([35,35]);    % 输出权重
-R = diag([1e-4,1e-4]);    % 输入权重
-lambda_u = 1e6;
+R = diag([10,10]);    % 输入权重
+lambda_u = 1e4;
 lambda_y = 1e4;
-lambda_a = 1e2;
+lambda_a = 1e0;
 
 % 离线收集数据
 S = 400;           % 数据样本数
@@ -29,11 +30,10 @@ exciting_mode = 0;  % 0:rand    1:freq_sweep    2:test
     phase = pi/2;   % 2个输入之间的相位差
 
 % 在线控制
-T = 2;
+T = 40;
 
-ur = [0;0];
-% yr = [0.5;0.1;0.2;0.3];
-yr = [0.65;0.77];
+yr = [0.6; 0.6];
+ur = [1.2; 1.8];
 
 %% 离线收集数据
 
@@ -92,10 +92,6 @@ plot(tspan_ext,y_ext)
 u_data = u_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
 y_data = y_ext(:,1:round(Ts/dt):length(tspan_ext)-1);
 
-% 加噪
-u_data = u_data + 0.02*rand(size(u_data,1),size(u_data,2));
-y_data = y_data + 0.02*rand(size(y_data,1),size(y_data,2));
-
 figure
 plot(1:size(u_data,2),u_data)
 
@@ -125,7 +121,7 @@ settings = struct( ...
 controller = ctr.deepc(N,T_ini);
 controller.setParams(Q,R,lambda_u,lambda_y,lambda_a);
 controller.init(u_data,y_data);
-controller.samplify(62,true);  % 手动指定保留奇异值
+controller.samplify(0.999,true); 
 controller.setup('osqp',settings);
 controller.setLogger(false);
 

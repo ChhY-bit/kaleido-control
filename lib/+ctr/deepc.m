@@ -112,9 +112,10 @@ classdef deepc < handle
         end
 
         function r = samplify(obj,r,ifplot)
-            %SAMPLIFY 按指定维数 r 对 Hankel 矩阵进行 SVD 截断。
-            %   r = obj.samplify(r,ifplot) 保留前 r 个奇异值方向并返回 r。
-            %   r 必须为正整数，且不超过当前拼接 Hankel 矩阵的奇异值数量。
+            %SAMPLIFY 按指定维数或累计能量比例对 Hankel 矩阵进行 SVD 截断。
+            %   r = obj.samplify(r,ifplot) 返回实际保留的奇异值方向数。
+            %   0 < r < 1 时，保留达到指定奇异值平方和比例的最少方向。
+            %   r >= 1 时，r 必须为正整数，且不超过当前拼接 Hankel 矩阵的奇异值数量。
             %   ifplot 默认为 false；为 true 时绘制截断前的奇异值并标记 r。
             %   重新选择更大的 r 前，需调用 init 恢复原始数据。
             narginchk(2,3);
@@ -126,11 +127,21 @@ classdef deepc < handle
             end
             Hankel = [obj.Hankel_u;obj.Hankel_y];
             validateattributes(r,{'numeric'}, ...
-                {'scalar','real','finite','integer','positive','<=',min(size(Hankel))}, ...
+                {'scalar','real','finite','positive','<=',min(size(Hankel))}, ...
                 mfilename,'r');
-            validateattributes(ifplot,{'logical','numeric'},{'scalar','binary'},mfilename,'ifplot');
             r = double(r);
+            if r >= 1
+                validateattributes(r,{'double'},{'integer'},mfilename,'r');
+            end
+            validateattributes(ifplot,{'logical','numeric'},{'scalar','binary'},mfilename,'ifplot');
+
             [W,Sigma,~] = svd(Hankel,'econ');
+            sigma = diag(Sigma);
+            if r < 1
+                cumulativeEnergy = cumsum(sigma.^2);
+                r = find(cumulativeEnergy >= r*cumulativeEnergy(end),1,'first');
+            end
+
             Hkl = W(:,1:r)*Sigma(1:r,1:r);
             obj.Hankel_u = Hkl(1:obj.m*(obj.N+obj.T_ini),1:r);
             obj.Hankel_y = Hkl(obj.m*(obj.N+obj.T_ini)+1:(obj.m+obj.p)*(obj.N+obj.T_ini),1:r);
@@ -139,8 +150,7 @@ classdef deepc < handle
             obj.resetSolver();
 
             if ifplot
-                sigma = diag(Sigma)+eps;
-                ctr.plots.plotSVD(sigma,r);
+                ctr.plots.plotSVD(sigma+eps,r);
             end
         end
 

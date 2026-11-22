@@ -1,4 +1,4 @@
-clear,clc,close all
+clear,clc%,close all
 
 %% 仿真设置
 rng(123);
@@ -6,71 +6,85 @@ rng(123);
 %% 参数设置
 
 % 被控对象模型
-A = [0.921, 0.000, 0.041, 0.000;...
-                 0.000, 0.918, 0.000, 0.033;...
-                 0.000, 0.000, 0.924, 0.000;...
-                 0.000, 0.000, 0.000, 0.937];
-B = [0.017, 0.001;...
-     0.001, 0.023;...
-     0.000, 0.061;...
-     0.072, 0.000];
+% A = [0.921, 0.000, 0.041, 0.000;...
+%                  0.000, 0.918, 0.000, 0.033;...
+%                  0.000, 0.000, 0.924, 0.000;...
+%                  0.000, 0.000, 0.000, 0.937];
+% B = [0.017, 0.001;...
+%      0.001, 0.023;...
+%      0.000, 0.061;...
+%      0.072, 0.000];
+
+A = [0,0,1,0;...
+     0,0,0,1;...
+     -3,1,-0.4,0.1;...
+     1,-4,0.1,-0.6];
+B = [0,0;...
+     0,0;...
+     1,0;...
+     0,1];
+sys = c2d(ss(A,B,[],[]),0.02);
+A = sys.A;
+B = sys.B;
 
 C = [1,0,0,0; 0,1,0,0];
 
 state_ini = [0;0;0;0];          % 初始状态
 
 % 控制器参数
-N = 30;             % 预测步数
+N = 20;             % 预测步数
 T_ini = 10;         % 初始长度
 Q = diag([35,35]);    % 输出权重
-% R = diag([1e-4,1e-4]);    % 输入权重
 R = diag([10,10]);    % 输入权重
-lambda_u = 1e6;
+% R = diag([10,10]);    % 输入权重
+lambda_u = 1e4;
 lambda_y = 1e4;
-lambda_a = 0;
+lambda_a = 1e0;
 
-Y_lb = [-2;-2];
+Y_lb = [0;0];
 Y_ub = [2;2];
-U_lb = [-2;-2];
+U_lb = [0;0];
 U_ub = [2;2];
 
 % 离线收集数据
 S = 400;           % 数据样本数
-amplitude = 3;
+amplitude = 1;
 
 
 % 在线控制
-T = 200;    % 步数
+T = 2000;    % 步数
 
-ur = [0.22694;1.40062];
-% ur = [0;0];
-yr = [0.65;0.5];
+
+% yr = [0.65;0.5];
+% ur = [0.22694;1.40062];
+
+yr = [0.6; 0.6];
+ur = [3, -1; -1, 4] * yr;  % [1.2; 1.8]
 
 %% 离线收集数据
 
 % 信号初始化
-u_ext = (2*rand(2,S)-1)*amplitude;
+% u_ext = (2*rand(2,S)-1)*amplitude;
+u_ext = amplitude*rand(2,S);
+
 x_ext = zeros(4,S);
     x_ext(:,1) = state_ini;
 y_ext = zeros(2,S);
     y_ext(:,1) = C*state_ini;
 
 for k=1:S-1
-    x_ext(:,k+1) = A*x_ext(:,k) + B*u_ext(:,k);
+    x_ext(:,k+1) = A*x_ext(:,k) + B*u_ext(:,k) + 0.002*randn(4,1);
     y_ext(:,k+1) = C*x_ext(:,k+1);
 end
 
 u_data = u_ext;
 y_data = y_ext;
 
-% 加噪
-% u_data = u_data + 0.002*(2*rand(size(y_data))-1);
-% y_data = y_data + 0.002*(2*rand(size(y_data))-1);
-
 % 预览数据
 figure
 plot(1:size(u_data,2),u_data)
 figure
+
 plot(1:size(y_data,2),y_data)
 
 %% 在线控制
@@ -85,7 +99,7 @@ settings = struct( ...
 controller = ctr.deepc(N,T_ini);
 controller.setParams(Q,R,lambda_u,lambda_y,lambda_a);
 controller.init(u_data,y_data);
-controller.samplify(84,true);  % 手动指定保留奇异值
+controller.samplify(0.9999,true);  % 手动指定保留奇异值
 controller.setup('osqp',settings);
 controller.setLogger(false);
 

@@ -21,13 +21,13 @@ gamma_2: 0.3
 
 # 约束参数
 ## 水箱高度 [m]
-TankHeight_1: 1.2
-TankHeight_2: 1.5
-TankHeight_3: 1.2
-TankHeight_4: 1.5
+TankHeight_1: 2
+TankHeight_2: 2
+TankHeight_3: 2
+TankHeight_4: 2
 ## 最大进水量 [m^3/s]
-PumpMaxFlow_1: 5
-PumpMaxFlow_2: 5
+PumpMaxFlow_1: 2
+PumpMaxFlow_2: 2
 
 # 其他参数
 ## 进水流速（影响进水孔径） [m/s]
